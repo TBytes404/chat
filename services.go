@@ -38,14 +38,9 @@ func helper(r io.Reader, fn func(string)) {
 	snr := bufio.NewScanner(r)
 	for snr.Scan() {
 		msg := snr.Text()
-		if len(msg) == 0 {
-			break
-		}
 		fn(msg)
 	}
-	if err := snr.Err(); err != nil {
-		if err != io.EOF {
-			log.Fatal(err)
-		}
+	if err := snr.Err(); err != nil && err != io.EOF {
+		log.Fatal(err)
 	}
 }
