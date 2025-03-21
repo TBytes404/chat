@@ -2,19 +2,21 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"slices"
 )
 
 type User struct {
 	Name string
+	Conn net.Conn
 }
 
-func NewUser(name string) *User {
-	return &User{name}
+func NewUser(name string, conn net.Conn) *User {
+	return &User{name, conn}
 }
 
 func (u *User) Receive(msg *Message) {
-	fmt.Printf("To %s,\n%s\n\tby %s\n", u.Name, msg.Text, msg.Author.Name)
+	fmt.Fprintln(u.Conn, msg.Author.Name, ":", msg.Text)
 }
 
 type Message struct {

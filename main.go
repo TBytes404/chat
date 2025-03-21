@@ -1,13 +1,12 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"io"
-	"log"
 	"net"
 	"os"
 )
+
+var room *Room
 
 func main() {
 	if len(os.Args) == 1 {
@@ -16,48 +15,17 @@ func main() {
 	}
 	switch os.Args[1] {
 	case "serve":
-		fmt.Println("Server Listening at Post 8000...")
-		srv, err := net.Listen("tcp", ":8000")
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer srv.Close()
-		for {
-			con, err := srv.Accept()
-			if err != nil {
-				log.Fatal(err)
-			}
-			addr := con.RemoteAddr().String()
-			fmt.Println(addr, "Connected...")
-			go helper(con, func(msg string) {
-				fmt.Println(addr, ":", msg)
-				fmt.Fprintln(con, msg)
-			})
-		}
+		room = NewRoom("Default")
+		serve(func(con net.Conn) {
+			user := NewUser(con.RemoteAddr().String(), con)
+			room.Subscribe(user)
+			fmt.Println(user.Name, "Connected...")
+			helper(con, func(msg string) { room.Publish(NewMessage(user, msg)) })
+		})
 	case "connect":
-		con, err := net.Dial("tcp", ":8000")
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer con.Close()
-		fmt.Println("Client Connected to Post 8000...")
-		go helper(con, func(msg string) { fmt.Println("@", msg) })
-		helper(os.Stdin, func(msg string) { fmt.Fprintln(con, msg) })
-	}
-}
-
-func helper(r io.Reader, fn func(string)) {
-	snr := bufio.NewScanner(r)
-	for snr.Scan() {
-		msg := snr.Text()
-		if len(msg) == 0 {
-			break
-		}
-		fn(msg)
-	}
-	if err := snr.Err(); err != nil {
-		if err != io.EOF {
-			log.Fatal(err)
-		}
+		connect(func(con net.Conn) {
+			go helper(con, func(msg string) { fmt.Println(msg) })
+			helper(os.Stdin, func(msg string) { fmt.Fprintln(con, msg) })
+		})
 	}
 }
