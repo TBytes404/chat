@@ -1,65 +1,63 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"slices"
+	"io"
+	"log"
+	"net"
+	"os"
 )
 
-type User struct {
-	Name string
-}
-
-func NewUser(name string) *User {
-	return &User{name}
-}
-
-func (u *User) Receive(msg *Message) {
-	fmt.Printf("To %s,\n%s\n\tby %s\n", u.Name, msg.Text, msg.Author.Name)
-}
-
-type Message struct {
-	Text   string
-	Author *User
-}
-
-func NewMessage(author *User, text string) *Message {
-	return &Message{text, author}
-}
-
-type Room struct {
-	Name     string
-	Members  []*User
-	Messages []*Message
-}
-
-func NewRoom(name string) *Room {
-	return &Room{name, []*User{}, []*Message{}}
-}
-
-func (r *Room) Subscribe(user *User) {
-	r.Members = append(r.Members, user)
-}
-
-func (r *Room) Broadcast(msg *Message) {
-	for _, u := range r.Members {
-		u.Receive(msg)
-	}
-}
-
-func (r *Room) Publish(msg *Message) {
-	if slices.Contains(r.Members, msg.Author) {
-		r.Messages = append(r.Messages, msg)
-	}
-	r.Broadcast(msg)
-}
-
 func main() {
-	user1 := NewUser("cathe")
-	user2 := NewUser("marrie")
+	if len(os.Args) == 1 {
+		fmt.Println("Your ~Favourite~ Chat Buddy <3")
+		return
+	}
+	switch os.Args[1] {
+	case "serve":
+		fmt.Println("Server Listening at Post 8000...")
+		srv, err := net.Listen("tcp", ":8000")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer srv.Close()
+		for {
+			con, err := srv.Accept()
+			if err != nil {
+				log.Fatal(err)
+			}
+			addr := con.RemoteAddr().String()
+			fmt.Println(addr, "Connected...")
+			go helper(con, func(msg string) {
+				fmt.Println(addr, ":", msg)
+				fmt.Fprintln(con, msg)
+			})
+		}
+	case "connect":
+		con, err := net.Dial("tcp", ":8000")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer con.Close()
+		fmt.Println("Client Connected to Post 8000...")
+		go helper(con, func(msg string) { fmt.Println("@", msg) })
+		helper(os.Stdin, func(msg string) { fmt.Fprintln(con, msg) })
+	}
+}
 
-	room := NewRoom("the holi hall")
-	room.Subscribe(user1)
-	room.Subscribe(user2)
-
-	room.Publish(NewMessage(user1, "i am an innocent message."))
+func helper(r io.Reader, fn func(string)) {
+	snr := bufio.NewScanner(r)
+	for snr.Scan() {
+		msg := snr.Text()
+		if len(msg) == 0 {
+			break
+		}
+		fn(msg)
+	}
+	if err := snr.Err(); err != nil {
+		if err != io.EOF {
+			log.Fatal(err)
+		}
+	}
 }
